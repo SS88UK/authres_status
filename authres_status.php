@@ -95,7 +95,7 @@ class authres_status extends rcube_plugin
 
     public function storage_init($p)
     {
-        $p['fetch_headers'] = trim($p['fetch_headers'] . ' ' . strtoupper('Authentication-Results') . ' ' . strtoupper('X-DKIM-Authentication-Results') . ' ' . strtoupper('X-Spam-Status') . ' ' . strtoupper('DKIM-Signature') . ' ' . strtoupper('DomainKey-Signature'));
+        $p['fetch_headers'] = trim($p['fetch_headers'] . ' ' . strtoupper('Authentication-Results') . ' ' . strtoupper('X-DKIM-Authentication-Results') . ' ' . strtoupper('X-Spam-Status') . ' ' . ' ' . strtoupper('X-Spam-Report') . ' ' . strtoupper('DKIM-Signature') . ' ' . strtoupper('DomainKey-Signature'));
         return $p;
     }
 
@@ -399,6 +399,33 @@ class authres_status extends rcube_plugin
                     if (array_search('DKIM_SIGNED', $m[0]) !== false) {
                         if (array_search('DKIM_VALID', $m[0]) !== false) {
                             if (array_search('DKIM_VALID_AU', $m[0])) {
+                                $status = self::STATUS_PASS;
+                                $title = 'DKIM_SIGNED, DKIM_VALID, DKIM_VALID_AU';
+                            } else {
+                                $status = self::STATUS_THIRD;
+                                $title = 'DKIM_SIGNED, DKIM_VALID';
+                            }
+                        } else {
+                            $status = self::STATUS_FAIL;
+                            $title = 'DKIM_SIGNED';
+                        }
+                    }
+                }
+				
+                /* Check for spamassassin's X-Spam-Report
+                */
+            } elseif ($headers->others['x-spam-report']) {
+                $status = self::STATUS_NOSIG;
+
+                $results = $headers->others['x-spam-report'];
+                if (is_array($results)) {
+                    $results = end($results); // Should we take first or last header found? Last has probably been added by our own MTA
+                }
+
+                if (preg_match_all('/DKIM_[^,=]+/', $results, $m)) {
+                    if (strstr($results, 'DKIM_SIGNED') !== false) {
+                        if (strstr($results, 'DKIM_VALID') !== false) {
+                            if (strstr($results, 'DKIM_VALID_AU')) {
                                 $status = self::STATUS_PASS;
                                 $title = 'DKIM_SIGNED, DKIM_VALID, DKIM_VALID_AU';
                             } else {
